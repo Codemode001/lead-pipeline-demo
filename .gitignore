@@ -6,3 +6,4 @@ node_modules
 sa-key.json
 next-env.d.ts
 .vercel
+*.tsbuildinfo
