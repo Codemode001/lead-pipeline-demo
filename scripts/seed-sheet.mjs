@@ -1,12 +1,16 @@
 // Fills a Google Sheet with sample/leads.csv and sample/ad-spend.csv, as the "Leads" and
 // "Ad Spend" tabs. Values go in RAW, so mixed date formats stay as typed, like a form feed.
 // Usage: node scripts/seed-sheet.mjs <service-account-key.json> <sheet id>
+//    or: node --env-file=.env.local scripts/seed-sheet.mjs   (reads the same env vars as the app)
 import { readFileSync } from "node:fs";
 import { JWT } from "google-auth-library";
 
-const [keyFile, sheetId] = process.argv.slice(2);
-if (!keyFile || !sheetId) throw new Error("usage: seed-sheet.mjs <key.json> <sheet id>");
-const key = JSON.parse(readFileSync(keyFile, "utf8"));
+const [keyFile, argSheetId] = process.argv.slice(2);
+const key = keyFile
+  ? JSON.parse(readFileSync(keyFile, "utf8"))
+  : { client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n") };
+const sheetId = argSheetId ?? process.env.SHEET_ID;
+if (!key.client_email || !key.private_key || !sheetId) throw new Error("usage: seed-sheet.mjs <key.json> <sheet id>, or set the env vars");
 const auth = new JWT({ email: key.client_email, key: key.private_key, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
 const api = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
 

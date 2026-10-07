@@ -11,7 +11,11 @@ export interface Lead {
   stage: Stage;
   quizScore: number | null;
   source: string;
-  created: Date; // UTC midnight of the day the lead came in
+  created: Date; // the day the lead came in
+  // The day each later event happened. These count in their own week, not the creation week.
+  quizDate: Date | null;
+  interviewDate: Date | null;
+  hiredDate: Date | null;
 }
 
 export interface CleanReport {
@@ -100,7 +104,7 @@ const stageRank = (s: Stage) => (s === "Lost" ? -1 : STAGES.indexOf(s));
 /**
  * rows: the Leads tab as a header row plus data rows, as the Sheets API returns them.
  * Duplicates (same email, or same phone digits) collapse into one lead: it keeps the
- * earliest date it came in and the furthest stage it reached.
+ * earliest date it came in, the furthest stage it reached, and the earliest date of each event.
  */
 export function cleanLeads(rows: string[][]): { leads: Lead[]; report: CleanReport } {
   const [header = [], ...data] = rows;
@@ -113,6 +117,9 @@ export function cleanLeads(rows: string[][]): { leads: Lead[]; report: CleanRepo
     stage: col("stage"),
     quiz: col("quiz score"),
     source: col("source"),
+    quizDate: col("quiz date"),
+    interviewDate: col("interview date"),
+    hiredDate: col("hired date"),
   };
   const get = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "").toString().trim() : "");
 
@@ -145,6 +152,9 @@ export function cleanLeads(rows: string[][]): { leads: Lead[]; report: CleanRepo
       quizScore: quizRaw && !Number.isNaN(+quizRaw) ? +quizRaw : null,
       source: get(row, idx.source) || "Unknown",
       created,
+      quizDate: parseDate(get(row, idx.quizDate)),
+      interviewDate: parseDate(get(row, idx.interviewDate)),
+      hiredDate: parseDate(get(row, idx.hiredDate)),
     };
 
     const key = email || `phone:${phone}`;
@@ -154,6 +164,10 @@ export function cleanLeads(rows: string[][]): { leads: Lead[]; report: CleanRepo
       if (lead.created < existing.created) existing.created = lead.created;
       if (stageRank(lead.stage) > stageRank(existing.stage) || lead.stage === "Lost") existing.stage = lead.stage;
       existing.quizScore ??= lead.quizScore;
+      for (const k of ["quizDate", "interviewDate", "hiredDate"] as const) {
+        const d = lead[k];
+        if (d && (!existing[k] || d < existing[k]!)) existing[k] = d;
+      }
       continue;
     }
     byKey.set(key, lead);
@@ -189,31 +203,44 @@ export function parseSpend(rows: string[][]): Map<string, number> {
 
 export interface WeekRow {
   week: string; // Monday, YYYY-MM-DD
+  // Counted in the week the lead came in:
   leads: number;
-  byStage: Record<Stage, number>;
-  reachedQuiz: number;
+  lost: number;
+  // Counted in the week the event happened, even if the lead came in earlier:
+  passedQuiz: number;
+  interviews: number;
   hired: number;
   spend: number | null;
 }
 
 /**
- * Counting rule: a lead belongs to the week it came in (Monday start), whatever stage it is
- * at now. "Reached quiz" counts leads at Quiz Completed or further.
+ * Counting rules (same split as a dispo-dated stats sheet):
+ * - Leads and Lost count in the week the lead came in.
+ * - Passed quiz, Interview and Hired count in the week each one happened.
+ *   A lead created Sep 29 who interviews Oct 7 is a lead in the Sep 29 week and an
+ *   interview in the Oct 6 week.
+ * Weeks run Monday to Sunday. Sheet dates are read as Pacific calendar dates.
  */
 export function weekly(leads: Lead[], spend: Map<string, number>): WeekRow[] {
   const weeks = new Map<string, WeekRow>();
-  const empty = () => Object.fromEntries([...STAGES, "Lost"].map((s) => [s, 0])) as Record<Stage, number>;
-  for (const lead of leads) {
-    const key = isoDay(weekStart(lead.created));
+  const row = (d: Date) => {
+    const key = isoDay(weekStart(d));
     let w = weeks.get(key);
     if (!w) {
-      w = { week: key, leads: 0, byStage: empty(), reachedQuiz: 0, hired: 0, spend: spend.get(key) ?? null };
+      w = { week: key, leads: 0, lost: 0, passedQuiz: 0, interviews: 0, hired: 0, spend: spend.get(key) ?? null };
       weeks.set(key, w);
     }
+    return w;
+  };
+  for (const lead of leads) {
+    const w = row(lead.created);
     w.leads++;
-    w.byStage[lead.stage]++;
-    if (stageRank(lead.stage) >= STAGES.indexOf("Quiz Completed")) w.reachedQuiz++;
-    if (lead.stage === "Hired") w.hired++;
+    if (lead.stage === "Lost") w.lost++;
+    if (lead.quizDate) row(lead.quizDate).passedQuiz++;
+    if (lead.interviewDate) row(lead.interviewDate).interviews++;
+    if (lead.hiredDate) row(lead.hiredDate).hired++;
   }
+  // Weeks with spend but no events still show.
+  for (const [key, amount] of spend) if (!weeks.has(key)) row(new Date(`${key}T00:00:00Z`)).spend = amount;
   return [...weeks.values()].sort((a, b) => a.week.localeCompare(b.week));
 }

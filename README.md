@@ -13,8 +13,10 @@ them week by week. Next.js (App Router) on Vercel. All data in the sheet is fake
   - reads mixed date formats: `2026-08-03`, `8/3/2026 2:22 PM`, `03-Aug-2026`, `Aug 3, 2026`,
     and Sheets serial numbers
   - maps stage spellings (`Quiz done`, `Interview Booked`, `Placed`, ...) onto one list
-- Counts each lead in the week it came in (Monday start), and shows cost per lead and per hire
-  against weekly ad spend.
+- Counts by two rules, like a dispo-dated stats sheet: leads (and lost leads) count in the week
+  they came in; passed quiz, interviews and hires count in the week each one happened, even for
+  a lead from an earlier week. Weeks run Monday to Sunday, Pacific time.
+- Shows cost per lead and per hire against weekly ad spend.
 - Works on a phone.
 
 ## Credentials

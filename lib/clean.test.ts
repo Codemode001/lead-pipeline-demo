@@ -36,17 +36,20 @@ test("cleanLeads drops test and blank rows and merges duplicates", () => {
   assert.equal(leads.find((l) => l.phone === "5550102222")!.stage, "Hired");
 });
 
-test("weekly counts each lead in the Monday week it came in", () => {
+test("leads count by creation week, later events by the week they happened", () => {
   const { leads } = cleanLeads([
-    ["Timestamp", "Name", "Email", "Stage"],
-    ["2026-08-02", "Sun", "a@x.io", "Hired"], // Sunday -> week of Jul 27
-    ["2026-08-03", "Mon", "b@x.io", "Quiz Completed"],
-    ["2026-08-09", "Sun2", "c@x.io", "New"],
+    ["Timestamp", "Name", "Email", "Stage", "Quiz Date", "Interview Date", "Hired Date"],
+    ["2026-09-29", "Ana", "a@x.io", "Interview", "9/30/2026", "Oct 7, 2026", ""], // like the spec's example: lead one week, interview the next
+    ["2026-10-06", "Ben", "b@x.io", "Hired", "2026-10-06", "2026-10-08", "12-Oct-2026"],
+    ["2026-10-04", "Cy", "c@x.io", "Lost", "", "", ""], // Sunday -> week of Sep 28
+    ["2026-10-07", "Ben again", "b@x.io", "New", "", "", ""], // duplicate keeps Ben's dates
   ]);
-  const spend = parseSpend([["Week Start", "Spend"], ["2026-08-03", "$1,200"]]);
+  const spend = parseSpend([["Week Start", "Spend"], ["10/6/2026", "$1,200"]]);
   const rows = weekly(leads, spend);
-  assert.deepEqual(rows.map((r) => [r.week, r.leads, r.reachedQuiz, r.hired, r.spend]), [
-    ["2026-07-27", 1, 1, 1, null],
-    ["2026-08-03", 2, 1, 0, 1200],
+  assert.deepEqual(rows.map((r) => [r.week, r.leads, r.lost, r.passedQuiz, r.interviews, r.hired, r.spend]), [
+    ["2026-09-28", 2, 1, 1, 0, 0, null],
+    ["2026-10-05", 1, 0, 1, 2, 0, 1200],
+    ["2026-10-12", 0, 0, 0, 0, 1, null],
   ]);
+  assert.equal(leads.find((l) => l.email === "b@x.io")!.stage, "Hired");
 });

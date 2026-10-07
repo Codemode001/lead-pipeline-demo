@@ -31,7 +31,7 @@ class GoogleSheetSource implements LeadSource {
   private ranges() {
     this.cache ??= (async () => {
       const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${this.sheetId}/values:batchGet`);
-      url.searchParams.append("ranges", "Leads!A:G");
+      url.searchParams.append("ranges", "Leads!A:J");
       url.searchParams.append("ranges", "'Ad Spend'!A:B");
       url.searchParams.set("valueRenderOption", "FORMATTED_VALUE");
       const res = await this.auth.request<{ valueRanges: { values?: string[][] }[] }>({ url: url.toString() });

@@ -67,7 +67,7 @@ export default function WeeklyChart({ data }: { data: WeekPoint[] }) {
           top: `${(y(h.leads) / H) * 100}%`,
         }}>
           <div><b>Week of {h.label}</b></div>
-          <div>{h.leads} leads · {h.hired} hired</div>
+          <div>{h.leads} new leads · {h.hired} hired that week</div>
           <div>Ad spend {h.spend === null ? "not entered" : usd(h.spend)}
             {h.spend !== null && h.leads > 0 && ` · ${usd(h.spend / h.leads)}/lead`}</div>
         </div>

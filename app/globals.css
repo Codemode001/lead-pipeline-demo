@@ -86,6 +86,7 @@ table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-nu
 th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
 th { color: var(--ink-2); font-weight: 500; }
+tfoot th { color: var(--ink); font-weight: 600; border-bottom: 0; }
 
 .cleaning { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px; color: var(--ink-2); }
 .cleaning b { color: var(--ink); }

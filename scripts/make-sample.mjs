@@ -51,20 +51,39 @@ function formatDate(d) {
 const today = Date.UTC(2026, 9, 7); // Oct 7, 2026
 const WEEKS = 10;
 const start = today - WEEKS * 7 * 86_400_000;
-const rows = [["Timestamp", "Name", "Email", "Phone", "Stage", "Quiz Score", "Source"]];
+const rows = [["Timestamp", "Name", "Email", "Phone", "Stage", "Quiz Score", "Source", "Quiz Date", "Interview Date", "Hired Date"]];
 const people = [];
+const usedPhones = new Set();
+const usedEmails = new Set();
 
 for (let t = start; t <= today; t += 86_400_000) {
   const weekIndex = Math.floor((t - start) / (7 * 86_400_000));
   const perDay = 2 + Math.floor(rand() * 4) + Math.floor(weekIndex / 3); // ad spend ramps up
   for (let i = 0; i < perDay; i++) {
     const f = pick(first), l = pick(last);
-    const email = `${f}.${l}${Math.floor(rand() * 90) + 10}@${pick(["gmail.com", "yahoo.com", "outlook.com", "icloud.com"])}`.toLowerCase();
-    const phone = `(${pick(["512", "602", "813", "469", "720"])}) 555-${String(Math.floor(rand() * 9000) + 1000)}`;
-    const stage = stageFor((today - t) / 86_400_000);
-    const quiz = ["Quiz Completed", "Interview", "Hired"].includes(stage) || (stage === "Lost" && rand() < 0.5)
-      ? String(Math.floor(rand() * 45) + 55) : "";
-    const row = [formatDate(new Date(t)), `${f} ${l}`, email, phone, pick(stageSpellings[stage]), quiz, pick(sources)];
+    let email;
+    do email = `${f}.${l}${Math.floor(rand() * 90) + 10}@${pick(["gmail.com", "yahoo.com", "outlook.com", "icloud.com"])}`.toLowerCase();
+    while (usedEmails.has(email));
+    usedEmails.add(email);
+    let phone;
+    do phone = `(${pick(["512", "602", "813", "469", "720"])}) 555-${String(Math.floor(rand() * 9000) + 1000)}`;
+    while (usedPhones.has(phone)); // two different people must never share a number
+    usedPhones.add(phone);
+    let stage = stageFor((today - t) / 86_400_000);
+    // Each later event happens some days after the one before. Anything that would land after
+    // today hasn't happened yet, so the lead stays at the earlier stage.
+    const later = (from, min, span) => from + (min + Math.floor(rand() * span)) * 86_400_000;
+    const tookQuiz = ["Quiz Completed", "Interview", "Hired"].includes(stage) || (stage === "Lost" && rand() < 0.5);
+    let quizAt = tookQuiz ? later(t, 0, 3) : null;
+    let interviewAt = quizAt && ["Interview", "Hired"].includes(stage) ? later(quizAt, 2, 6) : null;
+    let hiredAt = interviewAt && stage === "Hired" ? later(interviewAt, 3, 7) : null;
+    if (hiredAt && hiredAt > today) { hiredAt = null; stage = "Interview"; }
+    if (interviewAt && interviewAt > today) { interviewAt = null; stage = "Quiz Completed"; }
+    if (quizAt && quizAt > today) { quizAt = null; stage = "Contacted"; }
+    const quiz = quizAt ? String(Math.floor(rand() * 45) + 55) : "";
+    const day = (ms) => (ms ? formatDate(new Date(ms)).replace(/ .*$/, "") : "");
+    const row = [formatDate(new Date(t)), `${f} ${l}`, email, phone, pick(stageSpellings[stage]), quiz, pick(sources),
+      day(quizAt), day(interviewAt), day(hiredAt)];
     rows.push(row);
     people.push(row);
   }
@@ -78,17 +97,18 @@ for (let i = 0; i < 18; i++) {
   if (rand() < 0.5) again[2] = again[2].toUpperCase();
   if (rand() < 0.3) again[2] = ""; // matched on phone instead
   again[4] = pick(stageSpellings.New);
+  again[7] = again[8] = again[9] = ""; // a resubmitted form has no outcomes yet
   rows.splice(1 + Math.floor(rand() * (rows.length - 1)), 0, again);
 }
 // Test rows and blank rows from setting up the form.
 const testRows = [
-  ["2026-08-01", "Test Lead", "test@example.com", "", "New", "", "Facebook Ads"],
-  ["8/2/2026", "TEST - do not use", "owner@demo-recruiting.com", "", "New", "", ""],
-  ["2026-08-15 09:00:00", "asdf", "asdf@test.com", "", "Contacted", "", ""],
-  ["9/10/2026", "Dummy Candidate", "dummy@example.org", "(512) 555-0000", "Hired", "100", "Referral"],
+  ["2026-08-01", "Test Lead", "test@example.com", "", "New", "", "Facebook Ads", "", "", ""],
+  ["8/2/2026", "TEST - do not use", "owner@demo-recruiting.com", "", "New", "", "", "", "", ""],
+  ["2026-08-15 09:00:00", "asdf", "asdf@test.com", "", "Contacted", "", "", "", "", ""],
+  ["9/10/2026", "Dummy Candidate", "dummy@example.org", "(512) 555-0000", "Hired", "100", "Referral", "9/11/2026", "9/14/2026", "9/18/2026"],
 ];
 for (const r of testRows) rows.splice(1 + Math.floor(rand() * (rows.length - 1)), 0, r);
-for (let i = 0; i < 5; i++) rows.splice(1 + Math.floor(rand() * (rows.length - 1)), 0, ["", "", "", "", "", "", ""]);
+for (let i = 0; i < 5; i++) rows.splice(1 + Math.floor(rand() * (rows.length - 1)), 0, Array(10).fill(""));
 
 const csv = (rs) => rs.map((r) => r.map((c) => (/[",]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n") + "\n";
 mkdirSync("sample", { recursive: true });

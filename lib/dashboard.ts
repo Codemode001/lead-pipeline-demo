@@ -13,7 +13,7 @@ export async function loadDashboard() {
 
   const totalSpend = weeks.reduce((sum, w) => sum + (w.spend ?? 0), 0);
   const hired = stageCounts.Hired;
-  const reachedQuiz = weeks.reduce((sum, w) => sum + w.reachedQuiz, 0);
+  const reachedQuiz = leads.filter((l) => l.quizDate).length;
 
   return {
     source: source.name,

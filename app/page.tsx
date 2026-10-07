@@ -7,6 +7,8 @@ export const revalidate = 300;
 
 const usd = (n: number | null) => (n === null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`);
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+const pacific = (iso: string) =>
+  new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 const shortDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -32,16 +34,16 @@ export default async function Page() {
       <header className="top">
         <div>
           <h1>Lead Pipeline</h1>
-          <div className="sub">Recruiting leads, read live from a Google Sheet and counted by week (Monday start)</div>
+          <div className="sub">Recruiting leads, read live from a Google Sheet and counted by week (Monday to Sunday, Pacific time)</div>
         </div>
-        <div className="muted">Fetched {new Date(data.fetchedAt).toUTCString().replace(" GMT", " UTC")}</div>
+        <div className="muted">Fetched {pacific(data.fetchedAt)}</div>
       </header>
 
       <section className="tiles">
         <div className="tile"><div className="label">Leads</div><div className="value">{totals.leads}</div>
           <div className="note">after cleaning</div></div>
         <div className="tile"><div className="label">Reached the quiz</div><div className="value">{pct(totals.quizRate)}</div>
-          <div className="note">Quiz Completed or further</div></div>
+          <div className="note">of leads passed the quiz</div></div>
         <div className="tile"><div className="label">Hired</div><div className="value">{totals.hired}</div>
           <div className="note">{totals.leads ? pct(totals.hired / totals.leads) : "—"} of leads</div></div>
         <div className="tile"><div className="label">Cost per lead</div><div className="value">{usd(totals.costPerLead)}</div>
@@ -70,27 +72,35 @@ export default async function Page() {
       </section>
 
       <section className="card" style={{ marginBottom: 16 }}>
-        <h2>Leads by stage, week by week</h2>
+        <h2>Week by week</h2>
+        <p className="muted" style={{ margin: "-6px 0 10px" }}>Leads and Lost count in the week the lead came in. Passed quiz, Interviews and Hired count in the week they happened, even for a lead from an earlier week.</p>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Week of</th><th>Leads</th>
-                {STAGES.map((s) => <th key={s}>{s}</th>)}
-                <th>Lost</th><th>Ad spend</th><th>Cost / lead</th>
+                <th>Week of</th><th>Leads</th><th>Lost</th><th>Passed quiz</th><th>Interviews</th><th>Hired</th>
+                <th>Ad spend</th><th>Cost / lead</th>
               </tr>
             </thead>
             <tbody>
               {[...weeks].reverse().map((w) => (
                 <tr key={w.week}>
-                  <td>{shortDate(w.week)}</td><td>{w.leads}</td>
-                  {STAGES.map((s) => <td key={s}>{w.byStage[s]}</td>)}
-                  <td>{w.byStage.Lost}</td>
+                  <td>{shortDate(w.week)}</td><td>{w.leads}</td><td>{w.lost}</td>
+                  <td>{w.passedQuiz}</td><td>{w.interviews}</td><td>{w.hired}</td>
                   <td>{usd(w.spend)}</td>
                   <td>{w.spend === null || !w.leads ? "—" : usd(w.spend / w.leads)}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                {(["leads", "lost", "passedQuiz", "interviews", "hired"] as const).map((k) => (
+                  <th key={k}>{weeks.reduce((sum, w) => sum + w[k], 0)}</th>
+                ))}
+                <th>{usd(totals.spend)}</th><th>{usd(totals.costPerLead)}</th>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </section>
